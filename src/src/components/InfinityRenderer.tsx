@@ -14,6 +14,7 @@ function InfinityRenderer() {
   const [phase, setPhase] = useState<'EXPAND' | 'SHRINK'>('EXPAND')
 
   useEffect(() => {
+    document.title = 'INFINITY'
     if (!sceneRef.current) return
 
     const width = window.innerWidth
@@ -149,6 +150,7 @@ function InfinityRenderer() {
     Matter.Render.run(render)
 
     return () => {
+      document.title = 'BALL'
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)
       Matter.Engine.clear(engine)

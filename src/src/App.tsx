@@ -4,6 +4,7 @@ import BreakoutGame from './components/BreakoutGame'
 import InfinityRenderer from './components/InfinityRenderer'
 import BeadsCascade from './components/BeadsCascade'
 import StairsPhysics from './components/StairsPhysics'
+import MoveInteraction from './components/MoveInteraction'
 import './App.css'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
         <Route path="/infinity" element={<InfinityRenderer />} />
         <Route path="/beads" element={<BeadsCascade />} />
         <Route path="/stairs" element={<StairsPhysics />} />
+        <Route path="/move" element={<MoveInteraction />} />
       </Routes>
     </Router>
   )

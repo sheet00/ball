@@ -35,6 +35,7 @@ function BreakoutGame() {
   const sceneRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    document.title = 'BREAKOUT'
     if (!sceneRef.current) return
 
     const engine = Matter.Engine.create()
@@ -265,6 +266,7 @@ function BreakoutGame() {
     Matter.Render.run(render)
 
     return () => {
+      document.title = 'BALL'
       window.removeEventListener('mousemove', handleMouseMove)
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)

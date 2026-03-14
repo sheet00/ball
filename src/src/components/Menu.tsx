@@ -1,14 +1,20 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../App.css'
 
 function Menu() {
   const navigate = useNavigate()
 
+  useEffect(() => {
+    document.title = 'BALL'
+  }, [])
+
   const games = [
     { id: 'block', title: 'ブロック崩し', color: '#00d2ff' },
     { id: 'infinity', title: 'INFINITY', color: '#fd79a8' },
     { id: 'beads', title: 'BEADS', color: '#00d2ff' },
     { id: 'stairs', title: 'STAIRS', color: '#ffeaa7' },
+    { id: 'move', title: 'MOVE', color: '#55efc4' },
   ]
 
   return (

@@ -6,6 +6,7 @@ function BeadsCascade() {
   const sceneRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    document.title = 'BEADS'
     if (!sceneRef.current) return
 
     const width = window.innerWidth
@@ -81,6 +82,7 @@ function BeadsCascade() {
     Matter.Render.run(render)
 
     return () => {
+      document.title = 'BALL'
       clearInterval(beadInterval)
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)

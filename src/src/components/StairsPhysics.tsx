@@ -6,6 +6,7 @@ function StairsPhysics() {
   const sceneRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    document.title = 'STAIRS'
     if (!sceneRef.current) return
 
     const width = window.innerWidth
@@ -98,6 +99,7 @@ function StairsPhysics() {
     Matter.Render.run(render)
 
     return () => {
+      document.title = 'BALL'
       clearInterval(interval)
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)
