@@ -5,30 +5,29 @@ import './App.css'
 // --- ゲーム設定の集約 ---
 const SETTINGS = {
   BALL: {
-    RADIUS: 15,
-    RESTITUTION: 1.0, 
+    RADIUS: 18,
+    RESTITUTION: 1.0, // 加速なし（完全弾性）に戻す
     FRICTION: 0,
-    FRICTION_AIR: 0.005, // 空気抵抗を半分に（勢いがより長く続く）
-    MAX_COUNT: 50,
+    FRICTION_AIR: 0.005, 
+    MAX_COUNT: 1000,
+    MAX_SPEED: 25, 
     GHOST_DURATION: 200,
   },
   PADDLE: {
-    WIDTH: 225,
-    HEIGHT: 20,
-    RESTITUTION: 1.3,
-    BOOST_Y: -30,
-    BOOST_X_MULTI: 2.0,
+    RADIUS: 70,
+    RESTITUTION: 1.0, // マレットも加速なしに合わせる
+    BOOST_SPEED: 22,
   },
   BLOCK: {
-    ROWS: 6,
-    COLS: 20,
-    PADDING: 3,
-    HEIGHT: 15,
+    ROWS: 8,
+    COLS: 25,
+    PADDING: 2,
+    HEIGHT: 12,
   },
-  COLORS: ['#ff7675', '#74b9ff', '#ffeaa7'], // 3色に厳選（赤・青・黄）
+  COLORS: ['#ff7675', '#74b9ff', '#ffeaa7'], 
   WALL: {
     THICKNESS: 50,
-    COLOR: '#6c5ce7',
+    COLOR: 'rgba(255, 255, 255, 0.1)',
   }
 }
 
@@ -48,11 +47,10 @@ function App() {
         width: window.innerWidth,
         height: window.innerHeight,
         wireframes: false, 
-        background: '#a29bfe', 
+        background: '#020617', 
       },
     })
 
-    // --- 共通オブジェクト作成関数 ---
     const createBall = (x: number, y: number, radius: number, isGhost = false) => {
       const color = SETTINGS.COLORS[Math.floor(Math.random() * SETTINGS.COLORS.length)]
       const ball = Matter.Bodies.circle(x, y, radius, {
@@ -63,7 +61,9 @@ function App() {
         inertia: Infinity,
         render: { 
           fillStyle: color,
-          opacity: isGhost ? 0.5 : 1.0 
+          opacity: isGhost ? 0.5 : 1.0,
+          strokeStyle: '#ffffff',
+          lineWidth: 1
         }
       });
       
@@ -78,59 +78,78 @@ function App() {
       return ball
     }
 
-    let ballsArr: Matter.Body[] = []
-    let isResetting = false
-
-    // ステージ（ブロックとボール）をリセットする関数
-    const resetStage = () => {
-      // 1. 既存のボールをすべて削除
-      const currentBalls = Matter.Composite.allBodies(world).filter(b => b.label === 'ball')
-      Matter.Composite.remove(world, currentBalls)
-      ballsArr = []
-
-      // 2. 新しいボールを1つだけ生成
-      const newBall = createBall(window.innerWidth / 2, window.innerHeight - 150, SETTINGS.BALL.RADIUS)
-      Matter.Body.setVelocity(newBall, { x: 0, y: -20 })
-      ballsArr.push(newBall)
-      Matter.Composite.add(world, newBall)
-
-      // 3. ブロックを再生成 (外壁の内側に収める)
+    const spawnBlocks = () => {
       const newBlocks: Matter.Body[] = []
-      const effectiveWidth = window.innerWidth - SETTINGS.WALL.THICKNESS * 2
+      const effectiveWidth = window.innerWidth - 100 
       const blockWidth = (effectiveWidth - SETTINGS.BLOCK.PADDING * (SETTINGS.BLOCK.COLS + 1)) / SETTINGS.BLOCK.COLS
-      
       for (let r = 0; r < SETTINGS.BLOCK.ROWS; r++) {
         for (let c = 0; c < SETTINGS.BLOCK.COLS; c++) {
-          const x = SETTINGS.WALL.THICKNESS + SETTINGS.BLOCK.PADDING + blockWidth / 2 + c * (blockWidth + SETTINGS.BLOCK.PADDING)
-          const y = SETTINGS.WALL.THICKNESS + 20 + r * (SETTINGS.BLOCK.HEIGHT + SETTINGS.BLOCK.PADDING)
+          const x = 50 + SETTINGS.BLOCK.PADDING + blockWidth / 2 + c * (blockWidth + SETTINGS.BLOCK.PADDING)
+          const y = 80 + r * (SETTINGS.BLOCK.HEIGHT + SETTINGS.BLOCK.PADDING)
+          const color = SETTINGS.COLORS[(r + c) % SETTINGS.COLORS.length]
           const block = Matter.Bodies.rectangle(x, y, blockWidth, SETTINGS.BLOCK.HEIGHT, {
             label: 'block',
             isStatic: true,
-            render: { fillStyle: SETTINGS.COLORS[(r + c) % SETTINGS.COLORS.length] }
+            render: { 
+              fillStyle: color,
+              strokeStyle: '#ffffff',
+              lineWidth: 0.5
+            }
           })
           newBlocks.push(block)
         }
       }
       Matter.Composite.add(world, newBlocks)
-      
-      isResetting = false
     }
 
-    // 外壁
     const walls = [
-      Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight, window.innerWidth, SETTINGS.WALL.THICKNESS, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
-      Matter.Bodies.rectangle(window.innerWidth / 2, 0, window.innerWidth, SETTINGS.WALL.THICKNESS, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
-      Matter.Bodies.rectangle(0, window.innerHeight / 2, SETTINGS.WALL.THICKNESS, window.innerHeight, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
-      Matter.Bodies.rectangle(window.innerWidth, window.innerHeight / 2, SETTINGS.WALL.THICKNESS, window.innerHeight, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } })
+      Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight, window.innerWidth, 50, { isStatic: true, restitution: 1, render: { visible: false } }),
+      Matter.Bodies.rectangle(window.innerWidth / 2, 0, window.innerWidth, 50, { isStatic: true, restitution: 1, render: { visible: false } }),
+      Matter.Bodies.rectangle(0, window.innerHeight / 2, 50, window.innerHeight, { isStatic: true, restitution: 1, render: { visible: false } }),
+      Matter.Bodies.rectangle(window.innerWidth, window.innerHeight / 2, 50, window.innerHeight, { isStatic: true, restitution: 1, render: { visible: false } })
     ]
 
-    // パドル
-    const paddle = Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 80, SETTINGS.PADDLE.WIDTH, SETTINGS.PADDLE.HEIGHT, { 
+    const mallet = Matter.Bodies.polygon(window.innerWidth / 2, window.innerHeight - 150, 6, SETTINGS.PADDLE.RADIUS, { 
       label: 'paddle', 
       isStatic: true, 
       restitution: SETTINGS.PADDLE.RESTITUTION,
-      render: { fillStyle: '#fdcb6e' } 
+      render: { 
+        fillStyle: '#ffffff',
+        strokeStyle: '#00d2ff',
+        lineWidth: 2
+      } 
     })
+
+    let ballsArr: Matter.Body[] = []
+    let isResetting = false
+
+    Matter.Events.on(engine, 'beforeUpdate', () => {
+      const allBodies = Matter.Composite.allBodies(world)
+      allBodies.forEach(body => {
+        if (body.label === 'ball') {
+          const speed = Matter.Vector.magnitude(body.velocity)
+          if (speed > SETTINGS.BALL.MAX_SPEED) {
+            const ratio = SETTINGS.BALL.MAX_SPEED / speed
+            Matter.Body.setVelocity(body, {
+              x: body.velocity.x * ratio,
+              y: body.velocity.y * ratio
+            })
+          }
+        }
+      })
+    })
+
+    const resetStage = () => {
+      const currentBalls = Matter.Composite.allBodies(world).filter(b => b.label === 'ball')
+      Matter.Composite.remove(world, currentBalls)
+      ballsArr = []
+      const newBall = createBall(window.innerWidth / 2, window.innerHeight - 200, SETTINGS.BALL.RADIUS)
+      Matter.Body.setVelocity(newBall, { x: 0, y: -22 })
+      ballsArr.push(newBall)
+      Matter.Composite.add(world, newBall)
+      spawnBlocks()
+      isResetting = false
+    }
 
     Matter.Events.on(engine, 'collisionStart', (event) => {
       event.pairs.forEach((pair) => {
@@ -142,11 +161,31 @@ function App() {
           const ballBody = bodyA.label === 'ball' ? bodyA : bodyB
           const paddleBody = bodyA.label === 'paddle' ? bodyA : bodyB
           const deltaX = ballBody.position.x - paddleBody.position.x
-          const normalizedDeltaX = deltaX / (SETTINGS.PADDLE.WIDTH / 2)
+          const deltaY = ballBody.position.y - paddleBody.position.y
+          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1
           Matter.Body.setVelocity(ballBody, { 
-            x: normalizedDeltaX * 15, 
-            y: SETTINGS.PADDLE.BOOST_Y 
+            x: (deltaX / distance) * SETTINGS.PADDLE.BOOST_SPEED, 
+            y: (deltaY / distance) * SETTINGS.PADDLE.BOOST_SPEED 
           })
+        }
+
+        // ボール衝突 (1% 分裂)
+        const isBallCollision = bodyA.label === 'ball' && bodyB.label === 'ball'
+        if (isBallCollision) {
+          const ballA = bodyA as any
+          const ballB = bodyB as any
+          if (!ballA.isGhost && !ballB.isGhost && Math.random() < 0.01) {
+            const spawnX = (ballA.position.x + ballB.position.x) / 2
+            const spawnY = (ballA.position.y + ballB.position.y) / 2
+            const newBall = createBall(spawnX, spawnY, SETTINGS.BALL.RADIUS, true)
+            Matter.Body.setVelocity(newBall, { x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15 })
+            if (ballsArr.length >= SETTINGS.BALL.MAX_COUNT) {
+              const oldest = ballsArr.shift()
+              if (oldest) Matter.Composite.remove(world, oldest)
+            }
+            ballsArr.push(newBall)
+            Matter.Composite.add(world, newBall)
+          }
         }
 
         // ブロック衝突
@@ -160,23 +199,20 @@ function App() {
           const blockColor = blockBody.render.fillStyle
           const ballColor = ballBody.render.fillStyle
 
+          // どんなブロックでも破壊
           Matter.Composite.remove(world, blockBody)
 
-          // クリア判定（ブロックが全て消えたか）
           const remainingBlocks = Matter.Composite.allBodies(world).filter(b => b.label === 'block')
           if (remainingBlocks.length === 0 && !isResetting) {
             isResetting = true
             setTimeout(resetStage, 1000)
           }
 
-          // 同じ色だった場合のみ分裂
+          // 色が一致した時だけ分裂
           if (blockColor === ballColor) {
             const newBall = createBall(spawnPos.x, spawnPos.y, SETTINGS.BALL.RADIUS, true)
-            Matter.Body.setVelocity(newBall, { 
-              x: (Math.random() - 0.5) * 20, 
-              y: (Math.random() - 0.5) * 10 + 5 
-            })
-
+            newBall.render.fillStyle = SETTINGS.COLORS[Math.floor(Math.random() * SETTINGS.COLORS.length)]
+            Matter.Body.setVelocity(newBall, { x: (Math.random() - 0.5) * 25, y: (Math.random() - 0.5) * 15 + 5 })
             if (ballsArr.length >= SETTINGS.BALL.MAX_COUNT) {
               const oldest = ballsArr.shift()
               if (oldest) Matter.Composite.remove(world, oldest)
@@ -189,14 +225,15 @@ function App() {
     })
 
     const handleMouseMove = (event: MouseEvent) => {
-      const minX = SETTINGS.WALL.THICKNESS + SETTINGS.PADDLE.WIDTH / 2
-      const maxX = window.innerWidth - SETTINGS.WALL.THICKNESS - SETTINGS.PADDLE.WIDTH / 2
-      const x = Math.max(minX, Math.min(maxX, event.clientX))
-      Matter.Body.setPosition(paddle, { x, y: paddle.position.y })
+      const blockBottomY = 80 + SETTINGS.BLOCK.ROWS * (SETTINGS.BLOCK.HEIGHT + SETTINGS.BLOCK.PADDING)
+      const minY = blockBottomY + SETTINGS.PADDLE.RADIUS + 20
+      const x = Math.max(SETTINGS.PADDLE.RADIUS + 20, Math.min(window.innerWidth - SETTINGS.PADDLE.RADIUS - 20, event.clientX))
+      const y = Math.max(minY, Math.min(window.innerHeight - 50, event.clientY))
+      Matter.Body.setPosition(mallet, { x, y })
     }
 
-    Matter.Composite.add(world, [...walls, paddle])
-    resetStage() // 初期化時もresetStageを呼ぶことで一貫性を保つ
+    Matter.Composite.add(world, [...walls, mallet])
+    resetStage()
 
     window.addEventListener('mousemove', handleMouseMove)
 
