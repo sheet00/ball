@@ -1,31 +1,30 @@
-# React Template (Vite + TS + Docker Compose)
+# Ball - 2D Physics Breakout Game
 
-## プロジェクト構成
-- `docker-compose.yml`: ルートディレクトリ
-- `src/`: プロジェクトの全ソースコードと設定ファイル（`package.json` 等を含む）
+Matter.js を使用した、スタイリッシュでカオスな 2D 物理ブロック崩しゲームです。
 
-## 初期化の手順
-1. コンテナをバックグラウンドで起動します。
+## プロジェクトの特徴
+- **2D 物理演算**: Matter.js を活用した、リアルで爽快なボールの挙動。
+- **全方向マレット**: エアホッケーのような自由度の高い全方向操作。
+- **カラーマッチ増殖**: ボールの色とブロックの色が一致したときにボールが分裂する戦略的要素。
+- **カオス・インフレ**: 最大 1000 個のボールが画面を埋め尽くす圧倒的なわちゃわちゃ感。
+- **ベクター・スタイル**: 深宇宙をイメージした背景とネオンカラーによる洗練されたビジュアル。
+
+## 技術スタック
+- **Frontend**: React (TypeScript)
+- **Physics Engine**: Matter.js
+- **Build Tool**: Vite
+- **Infrastructure**: Docker Compose
+
+## 起動方法
+1. コンテナを起動します。
    ```bash
    docker compose up -d
    ```
-2. コンテナにログインします。
-   ```bash
-   docker compose exec app bash
-   ```
-3. コンテナ内の `/app` ディレクトリ（ホストの `src/`）で Vite を初期化します（※非対話形式）。
-   ```bash
-   npm exec --yes create-vite@latest -- . --template react-ts --yes
-   npm install
-   ```
+2. ブラウザで `http://localhost:5173` にアクセスしてください。
 
-## 起動方法
-1. `docker-compose.yml` の `command` を開発サーバー起動用に変更します。
-   ```yaml
-   command: sh -c "npm install && npm run dev -- --host"
-   ```
-2. コンテナを起動します。
-   ```bash
-   docker compose up
-   ```
-3. ブラウザで `http://localhost:5173` にアクセスしてください。
+## ゲームの操作
+- **マウス移動**: マレット（ヘキサゴン）を操作してボールを打ち返します。
+- **ブロック破壊**: ボールをブロックに当てて破壊します。
+- **ボール増殖**: ボールの色と同じ色のブロックを壊すと、新しいボールが生まれます。
+- **連鎖**: ボール同士が衝突すると稀（1%）に分裂が発生します。
+- **ステージリセット**: すべてのブロックを壊すと、ボールが 1 つにリセットされ、次のステージが始まります。
