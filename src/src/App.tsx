@@ -6,7 +6,7 @@ import './App.css'
 const SETTINGS = {
   BALL: {
     RADIUS: 18,
-    RESTITUTION: 1.0, // 加速なし（完全弾性）に戻す
+    RESTITUTION: 1.1, // わずかに加速する設定
     FRICTION: 0,
     FRICTION_AIR: 0.005, 
     MAX_COUNT: 1000,
@@ -76,6 +76,26 @@ function App() {
       }
       
       return ball
+    }
+
+    const spawnParticles = (x: number, y: number, color: string) => {
+      const count = 8
+      for (let i = 0; i < count; i++) {
+        const particle = Matter.Bodies.rectangle(x, y, 4, 4, {
+          label: 'particle',
+          collisionFilter: { group: -1 }, 
+          frictionAir: 0.05,
+          render: { fillStyle: color, opacity: 0.8 }
+        })
+        Matter.Body.setVelocity(particle, {
+          x: (Math.random() - 0.5) * 12,
+          y: (Math.random() - 0.5) * 12
+        })
+        Matter.Composite.add(world, particle)
+        setTimeout(() => {
+          Matter.Composite.remove(world, particle)
+        }, 1000)
+      }
     }
 
     const spawnBlocks = () => {
@@ -198,6 +218,9 @@ function App() {
           const spawnPos = { x: blockBody.position.x, y: blockBody.position.y }
           const blockColor = blockBody.render.fillStyle
           const ballColor = ballBody.render.fillStyle
+
+          // 演出: 破片を散らす
+          spawnParticles(spawnPos.x, spawnPos.y, blockColor as string)
 
           // どんなブロックでも破壊
           Matter.Composite.remove(world, blockBody)
