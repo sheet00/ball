@@ -5,11 +5,10 @@ import './App.css'
 // --- ゲーム設定の集約 ---
 const SETTINGS = {
   BALL: {
-    RADIUS: 20,
-    INITIAL_RADIUS: 25,
+    RADIUS: 15,
     RESTITUTION: 1.0, 
     FRICTION: 0,
-    FRICTION_AIR: 0.001, 
+    FRICTION_AIR: 0.005, // 空気抵抗を半分に（勢いがより長く続く）
     MAX_COUNT: 50,
     GHOST_DURATION: 200,
   },
@@ -26,7 +25,7 @@ const SETTINGS = {
     PADDING: 3,
     HEIGHT: 15,
   },
-  COLORS: ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#fd79a8', '#e17055', '#fdcb6e'],
+  COLORS: ['#ff7675', '#74b9ff', '#ffeaa7'], // 3色に厳選（赤・青・黄）
   WALL: {
     THICKNESS: 50,
     COLOR: '#6c5ce7',
@@ -90,7 +89,7 @@ function App() {
       ballsArr = []
 
       // 2. 新しいボールを1つだけ生成
-      const newBall = createBall(window.innerWidth / 2, window.innerHeight - 150, SETTINGS.BALL.INITIAL_RADIUS)
+      const newBall = createBall(window.innerWidth / 2, window.innerHeight - 150, SETTINGS.BALL.RADIUS)
       Matter.Body.setVelocity(newBall, { x: 0, y: -20 })
       ballsArr.push(newBall)
       Matter.Composite.add(world, newBall)
@@ -158,28 +157,33 @@ function App() {
           if ((ballBody as any).isGhost) return
           
           const spawnPos = { x: blockBody.position.x, y: blockBody.position.y }
+          const blockColor = blockBody.render.fillStyle
+          const ballColor = ballBody.render.fillStyle
+
           Matter.Composite.remove(world, blockBody)
 
           // クリア判定（ブロックが全て消えたか）
           const remainingBlocks = Matter.Composite.allBodies(world).filter(b => b.label === 'block')
           if (remainingBlocks.length === 0 && !isResetting) {
             isResetting = true
-            setTimeout(resetStage, 1000) // 1秒後にボールも含めてリセット
+            setTimeout(resetStage, 1000)
           }
 
-          // 分裂生成
-          const newBall = createBall(spawnPos.x, spawnPos.y, SETTINGS.BALL.RADIUS, true)
-          Matter.Body.setVelocity(newBall, { 
-            x: (Math.random() - 0.5) * 20, 
-            y: (Math.random() - 0.5) * 10 + 5 
-          })
+          // 同じ色だった場合のみ分裂
+          if (blockColor === ballColor) {
+            const newBall = createBall(spawnPos.x, spawnPos.y, SETTINGS.BALL.RADIUS, true)
+            Matter.Body.setVelocity(newBall, { 
+              x: (Math.random() - 0.5) * 20, 
+              y: (Math.random() - 0.5) * 10 + 5 
+            })
 
-          if (ballsArr.length >= SETTINGS.BALL.MAX_COUNT) {
-            const oldest = ballsArr.shift()
-            if (oldest) Matter.Composite.remove(world, oldest)
+            if (ballsArr.length >= SETTINGS.BALL.MAX_COUNT) {
+              const oldest = ballsArr.shift()
+              if (oldest) Matter.Composite.remove(world, oldest)
+            }
+            ballsArr.push(newBall)
+            Matter.Composite.add(world, newBall)
           }
-          ballsArr.push(newBall)
-          Matter.Composite.add(world, newBall)
         }
       })
     })
