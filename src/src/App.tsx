@@ -2,6 +2,37 @@ import { useEffect, useRef } from 'react'
 import Matter from 'matter-js'
 import './App.css'
 
+// --- ゲーム設定の集約 ---
+const SETTINGS = {
+  BALL: {
+    RADIUS: 20,
+    INITIAL_RADIUS: 25,
+    RESTITUTION: 1.0, 
+    FRICTION: 0,
+    FRICTION_AIR: 0.001, 
+    MAX_COUNT: 50,
+    GHOST_DURATION: 200,
+  },
+  PADDLE: {
+    WIDTH: 225,
+    HEIGHT: 20,
+    RESTITUTION: 1.3,
+    BOOST_Y: -30,
+    BOOST_X_MULTI: 2.0,
+  },
+  BLOCK: {
+    ROWS: 6,
+    COLS: 20,
+    PADDING: 3,
+    HEIGHT: 15,
+  },
+  COLORS: ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#fd79a8', '#e17055', '#fdcb6e'],
+  WALL: {
+    THICKNESS: 50,
+    COLOR: '#6c5ce7',
+  }
+}
+
 function App() {
   const sceneRef = useRef<HTMLDivElement>(null)
 
@@ -22,64 +53,85 @@ function App() {
       },
     })
 
-    const bounceProps = {
-      restitution: 1, 
-      friction: 0,
-      frictionAir: 0,
-      render: { fillStyle: '#6c5ce7' } 
+    // --- 共通オブジェクト作成関数 ---
+    const createBall = (x: number, y: number, radius: number, isGhost = false) => {
+      const color = SETTINGS.COLORS[Math.floor(Math.random() * SETTINGS.COLORS.length)]
+      const ball = Matter.Bodies.circle(x, y, radius, {
+        label: 'ball',
+        restitution: SETTINGS.BALL.RESTITUTION,
+        friction: SETTINGS.BALL.FRICTION,
+        frictionAir: SETTINGS.BALL.FRICTION_AIR,
+        inertia: Infinity,
+        render: { 
+          fillStyle: color,
+          opacity: isGhost ? 0.5 : 1.0 
+        }
+      });
+      
+      if (isGhost) {
+        (ball as any).isGhost = true
+        setTimeout(() => {
+          (ball as any).isGhost = false
+          ball.render.opacity = 1.0
+        }, SETTINGS.BALL.GHOST_DURATION)
+      }
+      
+      return ball
     }
 
-    const candyColors = ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#fd79a8', '#e17055', '#fdcb6e']
+    let ballsArr: Matter.Body[] = []
+    let isResetting = false
 
-    const wallThickness = 50
+    // ステージ（ブロックとボール）をリセットする関数
+    const resetStage = () => {
+      // 1. 既存のボールをすべて削除
+      const currentBalls = Matter.Composite.allBodies(world).filter(b => b.label === 'ball')
+      Matter.Composite.remove(world, currentBalls)
+      ballsArr = []
+
+      // 2. 新しいボールを1つだけ生成
+      const newBall = createBall(window.innerWidth / 2, window.innerHeight - 150, SETTINGS.BALL.INITIAL_RADIUS)
+      Matter.Body.setVelocity(newBall, { x: 0, y: -20 })
+      ballsArr.push(newBall)
+      Matter.Composite.add(world, newBall)
+
+      // 3. ブロックを再生成 (外壁の内側に収める)
+      const newBlocks: Matter.Body[] = []
+      const effectiveWidth = window.innerWidth - SETTINGS.WALL.THICKNESS * 2
+      const blockWidth = (effectiveWidth - SETTINGS.BLOCK.PADDING * (SETTINGS.BLOCK.COLS + 1)) / SETTINGS.BLOCK.COLS
+      
+      for (let r = 0; r < SETTINGS.BLOCK.ROWS; r++) {
+        for (let c = 0; c < SETTINGS.BLOCK.COLS; c++) {
+          const x = SETTINGS.WALL.THICKNESS + SETTINGS.BLOCK.PADDING + blockWidth / 2 + c * (blockWidth + SETTINGS.BLOCK.PADDING)
+          const y = SETTINGS.WALL.THICKNESS + 20 + r * (SETTINGS.BLOCK.HEIGHT + SETTINGS.BLOCK.PADDING)
+          const block = Matter.Bodies.rectangle(x, y, blockWidth, SETTINGS.BLOCK.HEIGHT, {
+            label: 'block',
+            isStatic: true,
+            render: { fillStyle: SETTINGS.COLORS[(r + c) % SETTINGS.COLORS.length] }
+          })
+          newBlocks.push(block)
+        }
+      }
+      Matter.Composite.add(world, newBlocks)
+      
+      isResetting = false
+    }
+
+    // 外壁
     const walls = [
-      Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight, window.innerWidth, wallThickness, { isStatic: true, ...bounceProps }),
-      Matter.Bodies.rectangle(window.innerWidth / 2, 0, window.innerWidth, wallThickness, { isStatic: true, ...bounceProps }),
-      Matter.Bodies.rectangle(0, window.innerHeight / 2, wallThickness, window.innerHeight, { isStatic: true, ...bounceProps }),
-      Matter.Bodies.rectangle(window.innerWidth, window.innerHeight / 2, wallThickness, window.innerHeight, { isStatic: true, ...bounceProps })
+      Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight, window.innerWidth, SETTINGS.WALL.THICKNESS, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
+      Matter.Bodies.rectangle(window.innerWidth / 2, 0, window.innerWidth, SETTINGS.WALL.THICKNESS, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
+      Matter.Bodies.rectangle(0, window.innerHeight / 2, SETTINGS.WALL.THICKNESS, window.innerHeight, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } }),
+      Matter.Bodies.rectangle(window.innerWidth, window.innerHeight / 2, SETTINGS.WALL.THICKNESS, window.innerHeight, { isStatic: true, restitution: 1, friction: 0, render: { fillStyle: SETTINGS.WALL.COLOR } })
     ]
 
-    const ball = Matter.Bodies.circle(window.innerWidth / 2, window.innerHeight - 150, 25, {
-      label: 'ball',
-      restitution: 1, 
-      friction: 0, 
-      frictionAir: 0.02, 
-      inertia: Infinity,
-      render: { fillStyle: '#ffeaa7' } 
-    })
-    Matter.Body.setVelocity(ball, { x: 0, y: -20 })
-
-    const paddleWidth = 150
-    const paddleHeight = 20
-    const paddle = Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 80, paddleWidth, paddleHeight, { 
+    // パドル
+    const paddle = Matter.Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 80, SETTINGS.PADDLE.WIDTH, SETTINGS.PADDLE.HEIGHT, { 
       label: 'paddle', 
       isStatic: true, 
-      restitution: 1.3,
+      restitution: SETTINGS.PADDLE.RESTITUTION,
       render: { fillStyle: '#fdcb6e' } 
     })
-
-    const rows = 6
-    const cols = 20
-    const blockPadding = 3
-    const blockWidth = (window.innerWidth - blockPadding * (cols + 1)) / cols
-    const blockHeight = 15
-    const blocks: Matter.Body[] = []
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = blockPadding + blockWidth / 2 + c * (blockWidth + blockPadding)
-        const y = 60 + r * (blockHeight + blockPadding)
-        const block = Matter.Bodies.rectangle(x, y, blockWidth, blockHeight, {
-          label: 'block',
-          isStatic: true,
-          render: { fillStyle: candyColors[(r + c) % candyColors.length] }
-        })
-        blocks.push(block)
-      }
-    }
-
-    let ballsArr: Matter.Body[] = [ball]
-    const MAX_BALLS = 50
 
     Matter.Events.on(engine, 'collisionStart', (event) => {
       event.pairs.forEach((pair) => {
@@ -90,17 +142,11 @@ function App() {
         if (isPaddleCollision) {
           const ballBody = bodyA.label === 'ball' ? bodyA : bodyB
           const paddleBody = bodyA.label === 'paddle' ? bodyA : bodyB
-          
-          // パドルの中心からの距離を計算 (-1.0 〜 1.0)
           const deltaX = ballBody.position.x - paddleBody.position.x
-          const normalizedDeltaX = deltaX / (paddleWidth / 2)
-          
-          // 当たった位置に応じて横方向の速度を決定 (端ほど鋭い角度に)
-          const bounceAngle = normalizedDeltaX * 15 // 最大15の横移動速度を付与
-          
+          const normalizedDeltaX = deltaX / (SETTINGS.PADDLE.WIDTH / 2)
           Matter.Body.setVelocity(ballBody, { 
-            x: bounceAngle, 
-            y: -30 // 常に強烈な上方向へのブースト
+            x: normalizedDeltaX * 15, 
+            y: SETTINGS.PADDLE.BOOST_Y 
           })
         }
 
@@ -109,42 +155,28 @@ function App() {
         if (isBlockCollision) {
           const blockBody = bodyA.label === 'block' ? bodyA : bodyB
           const ballBody = bodyA.label === 'ball' ? bodyA : bodyB
-          
-          // ボールがゴースト状態（無敵）ならブロックを壊さない
           if ((ballBody as any).isGhost) return
-
-          const spawnX = blockBody.position.x
-          const spawnY = blockBody.position.y
           
-          // 1. ブロックは即座に消去
+          const spawnPos = { x: blockBody.position.x, y: blockBody.position.y }
           Matter.Composite.remove(world, blockBody)
 
-          // 2. 新しいボールを即座に分裂生成
-          const newBall = Matter.Bodies.circle(spawnX, spawnY, 20, {
-            label: 'ball',
-            restitution: 1,
-            friction: 0,
-            frictionAir: 0.02,
-            inertia: Infinity,
-            render: { fillStyle: candyColors[Math.floor(Math.random() * candyColors.length)], opacity: 0.5 }
-          });
-          
-          (newBall as any).isGhost = true
+          // クリア判定（ブロックが全て消えたか）
+          const remainingBlocks = Matter.Composite.allBodies(world).filter(b => b.label === 'block')
+          if (remainingBlocks.length === 0 && !isResetting) {
+            isResetting = true
+            setTimeout(resetStage, 1000) // 1秒後にボールも含めてリセット
+          }
 
+          // 分裂生成
+          const newBall = createBall(spawnPos.x, spawnPos.y, SETTINGS.BALL.RADIUS, true)
           Matter.Body.setVelocity(newBall, { 
             x: (Math.random() - 0.5) * 20, 
             y: (Math.random() - 0.5) * 10 + 5 
           })
 
-          // 0.2秒後に実体化
-          setTimeout(() => {
-            (newBall as any).isGhost = false
-            newBall.render.opacity = 1.0
-          }, 200)
-
-          if (ballsArr.length >= MAX_BALLS) {
-            const oldestBall = ballsArr.shift()
-            if (oldestBall) Matter.Composite.remove(world, oldestBall)
+          if (ballsArr.length >= SETTINGS.BALL.MAX_COUNT) {
+            const oldest = ballsArr.shift()
+            if (oldest) Matter.Composite.remove(world, oldest)
           }
           ballsArr.push(newBall)
           Matter.Composite.add(world, newBall)
@@ -153,12 +185,14 @@ function App() {
     })
 
     const handleMouseMove = (event: MouseEvent) => {
-      const { clientX } = event
-      const x = Math.max(paddleWidth / 2, Math.min(window.innerWidth - paddleWidth / 2, clientX))
+      const minX = SETTINGS.WALL.THICKNESS + SETTINGS.PADDLE.WIDTH / 2
+      const maxX = window.innerWidth - SETTINGS.WALL.THICKNESS - SETTINGS.PADDLE.WIDTH / 2
+      const x = Math.max(minX, Math.min(maxX, event.clientX))
       Matter.Body.setPosition(paddle, { x, y: paddle.position.y })
     }
 
-    Matter.Composite.add(world, [...walls, ball, paddle, ...blocks])
+    Matter.Composite.add(world, [...walls, paddle])
+    resetStage() // 初期化時もresetStageを呼ぶことで一貫性を保つ
 
     window.addEventListener('mousemove', handleMouseMove)
 
