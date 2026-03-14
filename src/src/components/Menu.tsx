@@ -6,6 +6,7 @@ function Menu() {
 
   const games = [
     { id: 'block', title: 'ブロック崩し', color: '#00d2ff' },
+    { id: 'infinity', title: 'INFINITY', color: '#fd79a8' },
   ]
 
   return (
