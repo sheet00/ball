@@ -1,85 +1,26 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Matter from 'matter-js'
 import '../App.css'
 
 const SETTINGS = {
-  BALL_RADIUS: 180,
-  MAX_BALLS: 1000,
+  INITIAL_COUNT: 10,
+  INITIAL_RADIUS: 25,
+  MAX_BALLS: 500,
   COLORS: ['#00d2ff', '#3a47d5', '#fd79a8', '#ff7675', '#55efc4', '#ffeaa7'],
-  WALL_COLOR: 'rgba(255, 255, 255, 0.1)',
 }
 
 function InfinityRenderer() {
   const sceneRef = useRef<HTMLDivElement>(null)
-  const engineRef = useRef<Matter.Engine | null>(null)
-  const ballsArrRef = useRef<Matter.Body[]>([])
-
-  const createBall = (world: Matter.World, x: number, y: number, radius: number, isGhost = false, expires = false) => {
-    const color = SETTINGS.COLORS[Math.floor(Math.random() * SETTINGS.COLORS.length)]
-    const ball = Matter.Bodies.circle(x, y, radius, {
-      label: 'ball',
-      restitution: 1.0,
-      friction: 0,
-      frictionAir: 0,
-      inertia: Infinity,
-      render: { 
-        fillStyle: color,
-        strokeStyle: '#ffffff',
-        lineWidth: 1,
-        opacity: isGhost ? 0.6 : 1.0
-      }
-    });
-    
-    if (isGhost) {
-      (ball as any).isGhost = true
-      setTimeout(() => { 
-        (ball as any).isGhost = false; 
-        ball.render.opacity = 1.0 
-      }, 200)
-    }
-
-    if (expires) {
-      // 2秒後に消去するタイマー
-      setTimeout(() => {
-        ball.render.opacity = 0.3
-        setTimeout(() => {
-          Matter.Composite.remove(world, ball)
-          ballsArrRef.current = ballsArrRef.current.filter(b => b !== ball)
-        }, 500)
-      }, 1500)
-    }
-    
-    const angle = Math.random() * Math.PI * 2
-    const speed = 3 + Math.random() * 5
-    Matter.Body.setVelocity(ball, {
-      x: Math.cos(angle) * speed,
-      y: Math.sin(angle) * speed
-    })
-    
-    return ball
-  }
-
-  const handleReset = () => {
-    if (!engineRef.current) return
-    const world = engineRef.current.world
-    const allBalls = Matter.Composite.allBodies(world).filter(b => b.label === 'ball')
-    Matter.Composite.remove(world, allBalls)
-    ballsArrRef.current = []
-    const firstBall = createBall(world, window.innerWidth / 2, window.innerHeight / 2, SETTINGS.BALL_RADIUS)
-    ballsArrRef.current.push(firstBall)
-    Matter.Composite.add(world, firstBall)
-  }
+  const [phase, setPhase] = useState<'EXPAND' | 'SHRINK'>('EXPAND')
 
   useEffect(() => {
     if (!sceneRef.current) return
 
-    const width = sceneRef.current.clientWidth || window.innerWidth
-    const height = sceneRef.current.clientHeight || window.innerHeight
+    const width = window.innerWidth
+    const height = window.innerHeight
 
-    const engine = Matter.Engine.create()
-    engineRef.current = engine
+    const engine = Matter.Engine.create({ gravity: { x: 0, y: 0 } })
     const world = engine.world
-    engine.gravity.y = 0 
 
     const render = Matter.Render.create({
       element: sceneRef.current,
@@ -92,108 +33,144 @@ function InfinityRenderer() {
       },
     })
 
-    const wallOptions = { isStatic: true, restitution: 1.0, friction: 0, render: { fillStyle: SETTINGS.WALL_COLOR } }
-    const walls = [
-      Matter.Bodies.rectangle(width / 2, 0, width, 40, wallOptions), 
-      Matter.Bodies.rectangle(width / 2, height, width, 40, wallOptions), 
-      Matter.Bodies.rectangle(0, height / 2, 40, height, wallOptions), 
-      Matter.Bodies.rectangle(width, height / 2, 40, height, wallOptions), 
-    ]
-    Matter.Composite.add(world, walls)
+    let ballsArr: Matter.Body[] = []
+    let currentPhaseInternal: 'EXPAND' | 'SHRINK' = 'EXPAND'
 
-    const firstBall = createBall(world, width / 2, height / 2, SETTINGS.BALL_RADIUS)
-    ballsArrRef.current.push(firstBall)
-    Matter.Composite.add(world, firstBall)
+    // --- 演出用パーティクル生成関数 ---
+    const spawnParticles = (x: number, y: number, color: string, isImplosion = false) => {
+      const count = 10
+      for (let i = 0; i < count; i++) {
+        const particle = Matter.Bodies.rectangle(x, y, 3, 3, {
+          label: 'particle',
+          collisionFilter: { group: -1 },
+          frictionAir: 0.05,
+          render: { fillStyle: color, opacity: 0.8 }
+        })
+        
+        const velocity = isImplosion ? 
+          { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 5 } : // ゆっくり漂う
+          { x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15 } // 勢いよく散る
+        
+        Matter.Body.setVelocity(particle, velocity)
+        Matter.Composite.add(world, particle)
+        
+        setTimeout(() => {
+          Matter.Composite.remove(world, particle)
+        }, 800)
+      }
+    }
+
+    const createBall = (x: number, y: number, radius: number, isGhost = false) => {
+      const color = SETTINGS.COLORS[Math.floor(Math.random() * SETTINGS.COLORS.length)]
+      const ball = Matter.Bodies.circle(x, y, radius, {
+        label: 'ball',
+        restitution: 1,
+        friction: 0,
+        frictionAir: 0,
+        inertia: Infinity,
+        render: { fillStyle: color, opacity: isGhost ? 0.6 : 1.0 }
+      });
+      if (isGhost) {
+        (ball as any).isGhost = true
+        setTimeout(() => { (ball as any).isGhost = false; if (ball.render) ball.render.opacity = 1.0 }, 200)
+      }
+      const angle = Math.random() * Math.PI * 2
+      const speed = 3 + Math.random() * 3
+      Matter.Body.setVelocity(ball, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed })
+      return ball
+    }
+
+    for (let i = 0; i < SETTINGS.INITIAL_COUNT; i++) {
+      const b = createBall(Math.random() * width, Math.random() * height, SETTINGS.INITIAL_RADIUS)
+      ballsArr.push(b)
+      Matter.Composite.add(world, b)
+    }
+
+    Matter.Events.on(engine, 'beforeUpdate', () => {
+      const count = ballsArr.length
+      if (count > 200 && currentPhaseInternal === 'EXPAND') { // 100から200に
+        currentPhaseInternal = 'SHRINK'
+        setPhase('SHRINK')
+      } else if (count < 40 && currentPhaseInternal === 'SHRINK') { // 20から40に
+        currentPhaseInternal = 'EXPAND'
+        setPhase('EXPAND')
+      }
+    })
 
     Matter.Events.on(engine, 'collisionStart', (event) => {
       event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair
         if (bodyA.label === 'ball' && bodyB.label === 'ball') {
-          const ballA = bodyA as any
-          const ballB = bodyB as any
-          if (ballA.isGhost || ballB.isGhost) return
+          const bA = bodyA as any
+          const bB = bodyB as any
+          if (bA.isGhost || bB.isGhost) return
 
-          const radius = (ballA.circleRadius + ballB.circleRadius) / 4 
-          // 最小サイズ(2px)チェック
-          if (radius < 2) return
+          const spawnX = (bA.position.x + bB.position.x) / 2
+          const spawnY = (bA.position.y + bB.position.y) / 2
+          const baseColor = bA.render.fillStyle as string
 
-          const spawnX = (ballA.position.x + ballB.position.x) / 2
-          const spawnY = (ballA.position.y + ballB.position.y) / 2
+          Matter.Composite.remove(world, [bA, bB])
+          ballsArr = ballsArr.filter(b => b !== bA && b !== bB)
 
-          Matter.Composite.remove(world, [ballA, ballB])
-          ballsArrRef.current = ballsArrRef.current.filter(b => b !== ballA && b !== ballB)
-
-          for (let i = 0; i < 4; i++) {
-            // 次の分裂で2pxを切るなら、これが最終形態。2秒後に消す。
-            const willBeTooSmall = (radius / 2) < 2
-            const newBall = createBall(world, spawnX, spawnY, radius, true, willBeTooSmall)
-            if (ballsArrRef.current.length < SETTINGS.MAX_BALLS) {
-              ballsArrRef.current.push(newBall)
-              Matter.Composite.add(world, newBall)
+          if (currentPhaseInternal === 'EXPAND') {
+            // 分裂演出: 激しく火花を散らす
+            spawnParticles(spawnX, spawnY, baseColor, false)
+            for (let i = 0; i < 3; i++) {
+              const nb = createBall(spawnX, spawnY, SETTINGS.INITIAL_RADIUS, true)
+              if (ballsArr.length < SETTINGS.MAX_BALLS) {
+                ballsArr.push(nb)
+                Matter.Composite.add(world, nb)
+              }
             }
+          } else {
+            // 融合演出: 光が集まるように漂う
+            spawnParticles(spawnX, spawnY, '#ffffff', true)
+            const nb = createBall(spawnX, spawnY, SETTINGS.INITIAL_RADIUS, true)
+            nb.render.fillStyle = '#ffffff' // 合体直後は純白に
+            setTimeout(() => { 
+              if(nb.render) nb.render.fillStyle = baseColor 
+            }, 500)
+            ballsArr.push(nb)
+            Matter.Composite.add(world, nb)
           }
         }
       })
     })
 
-    const handleMouseDown = (event: MouseEvent) => {
-      const newBall = createBall(world, event.clientX, event.clientY, SETTINGS.BALL_RADIUS)
-      if (ballsArrRef.current.length >= SETTINGS.MAX_BALLS) {
-        const oldest = ballsArrRef.current.shift()
-        if (oldest) Matter.Composite.remove(world, oldest)
-      }
-      ballsArrRef.current.push(newBall)
-      Matter.Composite.add(world, newBall)
-    }
+    const wallOptions = { isStatic: true, restitution: 1, render: { visible: false } }
+    Matter.Composite.add(world, [
+      Matter.Bodies.rectangle(width / 2, -50, width, 100, wallOptions),
+      Matter.Bodies.rectangle(width / 2, height + 50, width, 100, wallOptions),
+      Matter.Bodies.rectangle(-50, height / 2, 100, height, wallOptions),
+      Matter.Bodies.rectangle(width + 50, height / 2, 100, height, wallOptions),
+    ])
 
-    const canvas = render.canvas
-    canvas.addEventListener('mousedown', handleMouseDown)
-
-    const runner = Matter.Runner.create()
-    Matter.Runner.run(runner, engine)
+    const runner = Matter.Runner.run(Matter.Runner.create(), engine)
     Matter.Render.run(render)
 
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown)
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)
       Matter.Engine.clear(engine)
       render.canvas.remove()
-      render.textures = {}
     }
   }, [])
 
   return (
     <div ref={sceneRef} className="canvas-container" style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      <button 
-        onClick={handleReset}
-        style={{
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          padding: '10px 24px',
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          color: 'white',
-          borderRadius: '2px',
-          cursor: 'pointer',
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          letterSpacing: '2px',
-          zIndex: 100,
-          transition: 'all 0.3s'
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-          e.currentTarget.style.borderColor = '#00d2ff'
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-        }}
-      >
-        RESET
-      </button>
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        left: '20px',
+        color: 'white',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        letterSpacing: '4px',
+        opacity: 0.4,
+        pointerEvents: 'none'
+      }}>
+        UNIVERSE: {phase}
+      </div>
     </div>
   )
 }
