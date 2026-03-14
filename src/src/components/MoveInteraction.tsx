@@ -32,7 +32,7 @@ function MoveInteraction() {
     const wallOptions = { 
       isStatic: true, 
       render: { fillStyle: '#1e293b' },
-      restitution: 0.5,
+      restitution: 0.8,
       friction: 0.1
     }
     const thickness = 100
@@ -56,7 +56,7 @@ function MoveInteraction() {
       const color = COLORS[Math.floor(Math.random() * COLORS.length)]
       
       const commonOptions = {
-        restitution: 0.4, // 標準的な反発
+        restitution: 0.8, // スーパーボールのようによく弾む
         friction: 0.1,  // 標準的な摩擦
         frictionAir: 0.01, // 自然な空気抵抗
         mass: 1 + Math.random() * 2, // 自然な重さ
@@ -108,7 +108,7 @@ function MoveInteraction() {
           // 約10%の確率で吹き飛ばす
           if (Math.random() < 0.1) {
             const angle = Math.random() * Math.PI * 2
-            const magnitude = 0.4 * body.mass // 少しパワーも微調整
+            const magnitude = 0.6 * body.mass // 吹き飛ばし力を強化
             
             Matter.Body.applyForce(body, body.position, {
               x: Math.cos(angle) * magnitude,
